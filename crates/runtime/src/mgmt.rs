@@ -9,7 +9,7 @@ use dashmap::DashMap;
 use lang::parse::{
     parse_command, parse_create_database, parse_create_table, parse_desc_table,
     parse_drop_database, parse_drop_table, parse_insert_into, parse_optimize_table,
-    parse_show_create_table, seek_to_sub_cmd, Pair, Rule,
+    parse_query, parse_show_create_table, seek_to_sub_cmd, Pair, QueryFormat, Rule,
 };
 use lightjit::jit;
 use meta::{
@@ -768,8 +768,18 @@ impl<'a> BaseMgmtSys<'a> {
         // raw_query: String,
     ) -> BaseRtResult<BaseCommandKind> {
         let read = READ.get().unwrap();
-        let blks = read(&self.meta_store, &self.part_store, query_id, current_db, p)?;
-        Ok(BaseCommandKind::Query(blks))
+        let ctx = parse_query(p.clone())?;
+        match ctx.format {
+            QueryFormat::Local => {
+                let blks =
+                    read(&self.meta_store, &self.part_store, query_id, current_db, p)?;
+                Ok(BaseCommandKind::Query(blks))
+            }
+            QueryFormat::Remote(format) => {
+                log::debug!("successfully parsed remote query to {:?} ", format);
+                unimplemented!()
+            }
+        }
     }
 
     fn parse_cmd_as_pair(cmds: &str) -> BaseRtResult<Pair<Rule>> {
